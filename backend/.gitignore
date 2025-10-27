@@ -1,0 +1,6 @@
+# Firebase keys
+firebase-key.json
+backend/firebase-key.json
+*.json
+.env
+node_modules/
