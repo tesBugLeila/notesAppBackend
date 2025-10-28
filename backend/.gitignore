@@ -1,6 +1,6 @@
 # Firebase keys
 firebase-key.json
 backend/firebase-key.json
-*.json
+/data
 .env
 node_modules/
