@@ -201,5 +201,170 @@ router.get('/', async (req, res) => {
     }
   });
 
+
+// GET /notes/:id/export - экспорт заметки в виде TXT-файла
+// router.get('/:id/export', async (req, res) => {
+//   try {
+//     if (!req.user || !req.user.uid) {
+//       return res.status(401).json({ error: 'Неавторизован' });
+//     }
+
+//     const note = await adapter.get(req.params.id);
+//     if (!note) {
+//       return res.status(404).json({ error: 'Заметка не найдена' });
+//     }
+
+//     if (note.uid !== req.user.uid) {
+//       return res.status(403).json({ error: 'Нет доступа к этой заметке' });
+//     }
+
+//     const formatDate = (timestamp) => {
+//       if (!timestamp) return 'не указана';
+//       try {
+//         const date = isNaN(timestamp) ? new Date(timestamp) : new Date(Number(timestamp));
+//         return date.toLocaleDateString('ru-RU');
+//       } catch {
+//         return String(timestamp);
+//       }
+//     };
+
+//     const formatTime = (timestamp, timeStr) => {
+//       if (timeStr) return timeStr;
+//       if (!timestamp) return 'не указано';
+//       try {
+//         const date = isNaN(timestamp) ? new Date(timestamp) : new Date(Number(timestamp));
+//         return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+//       } catch {
+//         return 'не указано';
+//       }
+//     };
+
+//     const content = `
+// ЗАМЕТКА: ${note.title || '(без названия)'}
+
+// Дата: ${formatDate(note.date)}
+// Время: ${formatTime(note.date, note.time)}
+// Теги: ${Array.isArray(note.tags) && note.tags.length > 0
+//   ? note.tags.map(tag => `#${tag}`).join(', ')
+//   : 'нет тегов'}
+
+// Содержание:
+// ${note.body || '(нет текста)'}
+
+// ---
+// Создана: ${formatDate(note.createdAt)}
+// Обновлена: ${formatDate(note.updatedAt)}
+// `.trim();
+
+//     // 🧹 Безопасное имя файла для заголовка (только ASCII)
+//     const safeFilename = `note_${note.id}.txt`;
+    
+//     // Альтернативное имя с транслитерацией кириллицы
+//     const transliterate = (text) => {
+//       const cyrToLat = {
+//         'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'zh',
+//         'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o',
+//         'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'h', 'ц': 'ts',
+//         'ч': 'ch', 'ш': 'sh', 'щ': 'sch', 'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu',
+//         'я': 'ya'
+//       };
+      
+//       return text
+//         .toLowerCase()
+//         .split('')
+//         .map(char => cyrToLat[char] || (/[a-z0-9]/.test(char) ? char : '_'))
+//         .join('')
+//         .replace(/_+/g, '_')
+//         .replace(/^_|_$/g, '');
+//     };
+
+//     const titleForFile = note.title ? transliterate(note.title).substring(0, 50) : 'note';
+//     const filenameWithTitle = `note_${titleForFile}_${note.id}.txt`;
+
+//     // Устанавливаем заголовки
+//     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+//     res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
+    
+//     // Дополнительный заголовок для Unicode имен (не все браузеры поддерживают)
+//     res.setHeader('X-Filename', encodeURIComponent(filenameWithTitle));
+
+//     // Отправляем содержимое
+//     res.send(content);
+
+//   } catch (error) {
+//     console.error('[Export] Ошибка:', error);
+//     res.status(500).json({ error: 'Ошибка при экспорте заметки' });
+//   }
+// });
+
+router.get('/:id/export', async (req, res) => {
+  try {
+    const note = await adapter.get(req.params.id);
+    if (!note) {
+      return res.status(404).json({ error: 'Заметка не найдена' });
+    }
+
+    // Проверяем права доступа
+    if (note.uid !== req.user.uid) {
+      return res.status(403).json({ error: 'Нет доступа к этой заметке' });
+    }
+
+    // Форматируем для экспорта
+    const formatDate = (timestamp) => {
+      if (!timestamp) return 'не указана';
+      try {
+        const date = new Date(Number(timestamp));
+        return date.toLocaleDateString('ru-RU');
+      } catch {
+        return String(timestamp);
+      }
+    };
+
+    const formatTime = (timestamp, timeStr) => {
+      if (timeStr) return timeStr;
+      if (!timestamp) return 'не указано';
+      try {
+        const date = new Date(Number(timestamp));
+        return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+      } catch {
+        return 'не указано';
+      }
+    };
+
+    const exportData = {
+      filename: `заметка_${note.title ? note.title.replace(/[^a-zA-Z0-9а-яА-Я]/g, '_') : note.id}.txt`,
+      content: `
+ЗАМЕТКА: ${note.title || '(без названия)'}
+
+Дата: ${formatDate(note.date)}
+Время: ${formatTime(note.date, note.time)}
+Теги: ${Array.isArray(note.tags) && note.tags.length > 0 
+  ? note.tags.map(tag => `#${tag}`).join(', ') 
+  : 'нет тегов'}
+
+Содержание:
+${note.body || '(нет текста)'}
+
+---
+Создана: ${formatDate(note.createdAt)}
+Обновлена: ${formatDate(note.updatedAt)}
+`.trim(),
+      note: note
+    };
+
+    res.json(exportData);
+  } catch (error) {
+    console.error('[Export] Ошибка:', error);
+    res.status(500).json({ error: 'Ошибка при экспорте заметки' });
+  }
+});
+
+
+
+
+
+
+
+
   return router;
 }
