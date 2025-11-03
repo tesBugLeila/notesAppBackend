@@ -309,7 +309,7 @@ router.get('/:id/export', async (req, res) => {
       return res.status(403).json({ error: 'Нет доступа к этой заметке' });
     }
 
-    // Форматируем для экспорта
+    // 🔹 Вспомогательные функции форматирования
     const formatDate = (timestamp) => {
       if (!timestamp) return 'не указана';
       try {
@@ -331,16 +331,15 @@ router.get('/:id/export', async (req, res) => {
       }
     };
 
-    const exportData = {
-      filename: `заметка_${note.title ? note.title.replace(/[^a-zA-Z0-9а-яА-Я]/g, '_') : note.id}.txt`,
-      content: `
+    // 🔹 Формируем текст заметки
+    const fileContent = `
 ЗАМЕТКА: ${note.title || '(без названия)'}
 
 Дата: ${formatDate(note.date)}
 Время: ${formatTime(note.date, note.time)}
-Теги: ${Array.isArray(note.tags) && note.tags.length > 0 
-  ? note.tags.map(tag => `#${tag}`).join(', ') 
-  : 'нет тегов'}
+Теги: ${Array.isArray(note.tags) && note.tags.length > 0
+        ? note.tags.map(tag => `#${tag}`).join(', ')
+        : 'нет тегов'}
 
 Содержание:
 ${note.body || '(нет текста)'}
@@ -348,17 +347,32 @@ ${note.body || '(нет текста)'}
 ---
 Создана: ${formatDate(note.createdAt)}
 Обновлена: ${formatDate(note.updatedAt)}
-`.trim(),
-      note: note
-    };
+`.trim();
 
-    res.json(exportData);
+    // 🔹 Безопасное имя файла
+    const filename = `zametka_${note.title ? note.title.replace(/[^a-zA-Z0-9]/g, '_') : note.id}.txt`;
+    const safeFilename = encodeURIComponent(filename);
+
+    // 🔹 Возвращаем файл или JSON (если передан ?asJson=true)
+    if (req.query.asJson === 'true') {
+      // Вернуть JSON для мобильного клиента
+      return res.json({
+        filename,
+        content: fileContent,
+        note
+      });
+    } else {
+      // Вернуть как файл (для браузера)
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${safeFilename}`);
+      res.send(fileContent);
+    }
+
   } catch (error) {
-    console.error('[Export] Ошибка:', error);
+    console.error('[Export] Ошибка экспорта:', error);
     res.status(500).json({ error: 'Ошибка при экспорте заметки' });
   }
 });
-
 
 
 
